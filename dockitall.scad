@@ -32,12 +32,12 @@ cable_gauge = 5;
 
 /* [Tolerances] */
 
-// How much extra space to leave around the device.
+// How much extra space to leave around the device (and through-hole for plug).
 device_tolerance = 1;
 // How much extra space to leave around the plug.
 plug_tolerance = .5;
 // How much extra space to leave around the cable.
-cable_tolerance = 1;
+cable_tolerance = .5;
 
 /* [Parameters] */
 
@@ -92,7 +92,7 @@ dock_width = device_width_total + left_wall_thickness + right_wall_thickness;
 dock_length = back_wall_length + chin_height;
 plug_width_total = plug_width + plug_tolerance;
 plug_depth_total = plug_depth + plug_tolerance;
-cable_total = cable_gauge + cable_tolerance; // XXX: should be 2*cable_tolerance
+cable_total = cable_gauge + 2*cable_tolerance;
 
 device_carveout_left = -device_width_total/2 -
   (left_wall_thickness ? 0 : eps);
@@ -157,7 +157,7 @@ union () {
     // through-hole plug carveout in back
     translate([port_x_offset, chin_height + plug_depth/2 + cable_tolerance, -eps])
       linear_extrude(back_wall_thickness + 2*eps)
-      plughole(cable_tolerance);
+      plughole(device_tolerance);
 
     // docking plug carveout in chin
     translate([0, chin_height + eps, plug_carveout_depth])
