@@ -7,12 +7,12 @@
 /* [Measurements] */
 
 // These measurements are based on my Pixel 2 XL in a
-// Ringke Fusion case, and the cable that comes with it.
+// Aeske Ultra slim case, and an Amazon Basics cable.
 
 // The width of the device.
-device_width = 80;
+device_width = 78;
 // The depth (thickness) of the device.
-device_depth = 10;
+device_depth = 9;
 
 // Offset of the port from the center of the bottom.
 port_x_offset = 0;
@@ -20,15 +20,15 @@ port_x_offset = 0;
 port_y_offset = 0;
 
 // The width of the USB plug.
-plug_width = 11;
+plug_width = 10.7;
 // The depth (thickness) of the USB plug.
-plug_depth = 5.85;
+plug_depth = 5.5;
 // The roundness of the USB plug (currently only supports plug_depth/2 and 0).
 plug_radius = plug_depth/2;
 // The length of the plug before tapering off to the cable.
-plug_length = 16;
+plug_length = 18;
 // The diameter of the cable immediately following the end of the plug.
-cable_gauge = 5;
+cable_gauge = 4.6;
 
 /* [Tolerances] */
 
