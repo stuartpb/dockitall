@@ -44,8 +44,6 @@ cable_tolerance = .5;
 // What angle to recline the phone at (from a straight-up zero degrees).
 recline_angle = 15;
 
-base_length = 50;
-
 // The height of the dock underneath the phone.
 // Should be at least as long as the plug, plus room for the cable to turn.
 chin_height = 32;
@@ -107,6 +105,8 @@ plug_carveout_depth = back_wall_thickness + port_y_offset + device_depth_total/2
 left_wall_cut = back_wall_length - left_wall_length;
 right_wall_cut = back_wall_length - right_wall_length;
 
+base_length = dock_width * cos(30);
+
 module plughole(tolerance) {
   union () {
     square([plug_width - 2*plug_radius, plug_depth + 2*tolerance], center=true);
@@ -115,10 +115,8 @@ module plughole(tolerance) {
   }
 }
 
-union () {
-  // dock
-  translate([0, -base_length/2, 0]) rotate([90 - recline_angle, 0, 0]) difference () {
-
+module dockblock() {
+  difference () {
     // starting block
     translate([-dock_width/2, 0, 0]) linear_extrude(dock_depth) square([dock_width, dock_length]);
 
@@ -169,14 +167,26 @@ union () {
       rotate([90, 0, 0]) linear_extrude(chin_height + eps)
       translate([port_x_offset, port_y_offset]) circle(d = cable_total);
   }
+}
 
-  // base
-  translate([-dock_width/2, -base_length/2, 0]) linear_extrude(base_thickness)
+module base() {
+  translate([-dock_width/2, -base_length/2 - dock_depth / cos(recline_angle), 0]) linear_extrude(base_thickness)
     difference() {
-      square([dock_width, base_length]);
+      polygon([[dock_width/2,base_length],[dock_width,0],[0,0]]);
+      // don't cut into the chin
+      square([dock_width, dock_depth / cos(recline_angle)]);
       translate([dock_width/2 - cable_total/2 + port_x_offset, -eps])
         square([cable_total, base_length + eps]);
     }
+}
+
+union () {
+  // dock
+  translate([0, -base_length/2, 0]) rotate([90 - recline_angle, 0, 0])
+    dockblock();
+
+  // base
+  base();
 
   // frontal foot between base and dock
   translate([dock_width/2, -base_length/2, 0]) rotate([90, 0, -90]) linear_extrude(dock_width)
