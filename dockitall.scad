@@ -4,6 +4,10 @@
 // version    : 0.1.0
 // file       : dockitall.scad
 
+/* [Cosmetic] */
+
+stripe_width = 10;
+
 /* [Measurements] */
 
 // These measurements are based on my Pixel 2 XL in a
@@ -180,17 +184,47 @@ module base() {
     }
 }
 
-union () {
-  // dock
-  translate([0, -base_length/2, 0]) rotate([90 - recline_angle, 0, 0])
-    dockblock();
+module striping() {
+  translate([-150,-150,0]) rotate([45,45,45]) for (offset=[0:2*stripe_width:200]) {
+    translate([offset, 0, 0]) cube([stripe_width, 200,200]);
+  }
+}
 
-  // base
-  base();
-
+module dockplus() {
+  union () {
+    translate([0, -base_length/2, 0]) rotate([90 - recline_angle, 0, 0])
+      dockblock();
+  }
   // frontal foot between base and dock
   translate([dock_width/2, -base_length/2, 0]) rotate([90, 0, -90]) linear_extrude(dock_width)
     polygon([[-eps, 0],
       [dock_depth / cos(recline_angle), 0],
       [dock_depth * cos(recline_angle), dock_depth * sin(recline_angle)]]);
 }
+
+module onepiece() {
+  union () {
+    dockplus();
+    base();
+  }
+}
+
+module basestripes() {
+  union () {
+    intersection () {
+      dockplus();
+      striping();
+    }
+    base();
+  }
+}
+
+module offstripes() {
+  difference () {
+    dockplus();
+    striping();
+    base();
+  }
+}
+
+onepiece();
