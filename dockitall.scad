@@ -14,9 +14,9 @@ stripe_width = 10;
 // Aeske Ultra slim case, and an Amazon Basics cable.
 
 // The width of the device.
-device_width = 78;
+device_width = 80;
 // The depth (thickness) of the device.
-device_depth = 9;
+device_depth = 10;
 
 // Offset of the port from the center of the bottom.
 port_x_offset = 0;
@@ -26,7 +26,7 @@ port_y_offset = 0;
 // The width of the USB plug.
 plug_width = 10.7;
 // The depth (thickness) of the USB plug.
-plug_depth = 5.5;
+plug_depth = 5;
 // The roundness of the USB plug (currently only supports plug_depth/2 and 0).
 plug_radius = plug_depth/2;
 // The length of the plug before tapering off to the cable.
@@ -39,9 +39,9 @@ cable_gauge = 4.6;
 // How much extra space to leave around the device (and through-hole for plug).
 device_tolerance = 1;
 // How much extra space to leave around the plug.
-plug_tolerance = .5;
+plug_tolerance = 0;
 // How much extra space to leave around the cable.
-cable_tolerance = .5;
+cable_tolerance = 0;
 
 /* [Parameters] */
 
