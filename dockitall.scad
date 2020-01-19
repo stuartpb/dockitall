@@ -23,7 +23,7 @@ device_front_cr = 2;
 // The radius of the device's back edges.
 device_back_cr = 2;
 
-// The radius of the orner that will descend to the lip.
+// The radius of the corner that will descend to the lip.
 screen_bottom_cr = 4;
 
 // Offset of the port from the center of the bottom.
@@ -119,25 +119,52 @@ right_wall_cut = back_wall_length - right_wall_length;
 base_length = dock_width * cos(30);
 
 module plughole() {
-  union () {
-    square([plug_width - 2*plug_radius, plug_depth], center=true);
-    translate([-plug_width/2 + plug_radius, 0]) circle(r=plug_radius);
-    translate([plug_width/2 - plug_radius, 0]) circle(r=plug_radius);
+  round_corner_rect(plug_width,plug_depth,plug_radius);
+}
+
+module round_4corners_rect(w,h,tr_r,br_r,bl_r,tl_r) {
+
+  // assuming all round corners and no corners with a diameter
+  // greater than a dimension of the rect
+  assert(min(w,h)>=2*max(tr_r,br_r,bl_r,tl_r));
+  assert(0<max(tr_r,br_r,bl_r,tl_r));
+
+  // a simple hulling variant (ie. passing first condition/assumption)
+  // that could handle square corners (ie. failing second test)
+  // could do this test
+  //assert(min(w,h)>=max(tr_r+br_r,br_r+bl_r,bl_r+tl_r,tl_r+tr_r))
+  // it could be still used safely with the 2-circle-and-square path,
+  // because all 4 corners need to be equal for those
+
+  // note that these tests assume we don't have any
+  // diameter-greater-than-dimension corners
+  if (h==tl_r+bl_r && h==tr_r+br_r) union () {
+    square([w - h, h], center=true);
+    translate([-w/2 + tr_r, 0]) circle(tr_r);
+    translate([w/2 - tr_r, 0]) circle(tr_r);
+  }
+  else if (w==tl_r+tr_r && w==bl_r+br_r) union () {
+    square([w, h-w], center=true);
+    translate([0,-h/2 + tr_r]) circle(tr_r);
+    translate([0,h/2 - tr_r]) circle(tr_r);
+  } else hull() {
+    translate([w/2-tr_r,h/2-tr_r]) circle(tr_r);
+    translate([w/2-br_r,-h/2+br_r]) circle(br_r);
+    translate([-w/2+bl_r,-h/2+bl_r]) circle(bl_r);
+    translate([-w/2+tl_r,h/2-tl_r]) circle(tl_r);
   }
 }
 
-module cs_right_corners() {
-  translate([device_width/2-device_back_cr, device_depth/2-device_back_cr])
-    circle(r=device_back_cr);
-  translate([device_width/2-device_front_cr, -device_depth/2+device_front_cr])
-    circle(r=device_front_cr);
+module round_2corners_rect(w,h,t_r,b_r) {
+  round_4corners_rect(w,h,t_r,b_r,b_r,t_r);
+}
+
+module round_corner_rect(w,h,r) {
+  round_4corners_rect(w,h,r,r,r,r);
 }
 
 module cross_section() {
-  hull() {
-    cs_right_corners();
-    mirror([1,0,0]) cs_right_corners();
-  }
+  round_2corners_rect(device_width,device_depth,device_back_cr,device_front_cr);
 }
 
 module dock_walls() {
@@ -259,4 +286,5 @@ module offstripes() {
 //onepiece();
 
 //dockblock();
-dock_walls();
+//dock_walls();
+plughole();
