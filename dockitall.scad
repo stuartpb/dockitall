@@ -19,9 +19,9 @@ device_width = 80;
 device_depth = 10;
 
 // The radius of the device's front edges.
-device_front_cr = 2;
+device_front_cr = 3;
 // The radius of the device's back edges.
-device_back_cr = 4;
+device_back_cr = 5;
 
 // The radius of the bottom left and right corners.
 device_bottom_cr = 8;
@@ -30,7 +30,7 @@ device_bottom_cr = 8;
 screen_width = 70;
 
 // The radius of the corner that will descend to the lip.
-screen_cr = 4;
+screen_cr = 5;
 
 // Offset of the port from the center of the bottom.
 port_x_offset = 0;
@@ -56,9 +56,9 @@ cable_gauge = 4.6;
 // How much extra space to leave around the device.
 device_tolerance = 0;
 // How much extra space to leave around the through-hole for the plug.
-through_tolerance = 1;
+through_tolerance = 0.5;
 // How much extra space to leave around the plug.
-plug_tolerance = 0.2;
+plug_tolerance = 0.1;
 // How much extra space to leave around the cable.
 cable_tolerance = 0;
 
@@ -93,10 +93,10 @@ back_wall_top_cr = 3;
 // How wide of a gap to put in the middle of the lip (eg. for a speaker).
 lip_cleft_width = 32;
 // The height of the lip within the cleft (ie. beneath the speaker).
-lip_cleft_height = 7;
+lip_cleft_height = 6;
 
-lip_cleft_inside_fillet = 3.5;
-lip_cleft_outside_fillet = 3.5;
+lip_cleft_inside_fillet = 3;
+lip_cleft_outside_fillet = 3;
 
 /* [Rendering] */
 
