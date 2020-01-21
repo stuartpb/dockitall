@@ -21,13 +21,16 @@ device_depth = 10;
 // The radius of the device's front edges.
 device_front_cr = 2;
 // The radius of the device's back edges.
-device_back_cr = 2;
+device_back_cr = 4;
 
 // The radius of the bottom left and right corners.
 device_bottom_cr = 8;
 
+// The width of the front opening for the screen.
+screen_width = 70;
+
 // The radius of the corner that will descend to the lip.
-lip_side_fillet_cr = 4;
+screen_cr = 4;
 
 // Offset of the port from the center of the bottom.
 port_x_offset = 0;
@@ -51,11 +54,11 @@ cable_gauge = 4.6;
 /* [Tolerances] */
 
 // How much extra space to leave around the device.
-device_tolerance = 1;
+device_tolerance = 0;
 // How much extra space to leave around the through-hole for the plug.
-through_tolerance = 1;
+through_tolerance = .5;
 // How much extra space to leave around the plug.
-plug_tolerance = 0;
+plug_tolerance = 0.25;
 // How much extra space to leave around the cable.
 cable_tolerance = 0;
 
@@ -90,10 +93,10 @@ back_wall_top_cr = 3;
 // How wide of a gap to put in the middle of the lip (eg. for a speaker).
 lip_cleft_width = 32;
 // The height of the lip within the cleft (ie. beneath the speaker).
-lip_cleft_height = 4;
+lip_cleft_height = 7;
 
-lip_cleft_inside_fillet = 2;
-lip_cleft_outside_fillet = 2;
+lip_cleft_inside_fillet = 3.5;
+lip_cleft_outside_fillet = 3.5;
 
 /* [Rendering] */
 
@@ -242,8 +245,8 @@ module dock_front_face() {
   difference() {
     dock_face_common();
     translate([0,flat_cuts?chin_hem:0]) {
-      translate([0, chin_height+lip_height+wall_height/2+lip_side_fillet_cr/2])
-        round_corner_rect(device_width_total,wall_height+lip_side_fillet_cr, lip_side_fillet_cr);
+      translate([0, chin_height+lip_height+wall_height/2+screen_cr/2])
+        round_corner_rect(device_width_total,wall_height+screen_cr, screen_cr);
       translate([0, chin_height+lip_height])
         round_corner_rect(lip_cleft_width,2*lip_cleft_height, lip_cleft_inside_fillet);
       translate([lip_cleft_width/2, chin_height+lip_height]) mirror([0,1])
@@ -338,8 +341,8 @@ module dockblock() {
 
 module test_dockblock() {
   intersection() {
-    translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,40]);
-    translate([0,0,-10]) new_dockblock();
+    translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,30]);
+    translate([0,0,-30]) new_dockblock();
   }
 }
 
@@ -375,16 +378,12 @@ module new_dockblock() {
 }
 
 module base() {
-  translate([-dock_width/2, -base_length/2 - dock_depth / cos(recline_angle), 0]) linear_extrude(base_thickness)
+  translate([-dock_width/2, -dock_depth/2, 0]) linear_extrude(base_thickness)
     difference() {
-      polygon([[dock_width/2,base_length],[dock_width,0],[0,0]]);
+        polygon([[dock_width/2,base_length],[dock_width,0],[0,0]]);
       
-      // delete part of base extending into the hem of the dock block
-      // TODO: Review:
-     //    Should this maybe just be everything south of the X axis?
-      //   Does dock_depth / cos(recline_angle) scale the height of the dock?
-      //   Is that, in other words? what this does?
-      square([dock_width, dock_depth / cos(recline_angle)]);
+      // delete any part of the base that may extend out the front
+      square([dock_width, dock_depth /2]);
       
       translate([dock_width/2 - cable_total/2 + port_x_offset, -eps])
         square([cable_total, base_length + eps]);
@@ -409,18 +408,10 @@ module dockplus() {
       [dock_depth * cos(recline_angle), dock_depth * sin(recline_angle)]]);
 }
 
-module new_dockplus() {
-  intersection () {
-    rotate([-recline_angle, 0, 0])
-      new_dockblock();
-    //TODO: Bounding box, I think?
-    // No: work the foot cutoff into the side definition.
-  }
-}
-
 module onepiece() {
   union () {
-    dockplus();
+    rotate([-recline_angle, 0, 0])
+      new_dockblock();
     base();
   }
 }
@@ -450,5 +441,5 @@ module offstripes() {
 //dock_walls();
 //plughole();
 
-//new_dockplus();
+//onepiece();
 test_dockblock();
