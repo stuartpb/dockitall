@@ -1,7 +1,7 @@
 //!OpenSCAD
 // title      : Dockitall Parametric Charging Dock
 // author     : Stuart P. Bentley (@stuartpb)
-// version    : 0.1.0
+// version    : 0.2.0
 // file       : dockitall.scad
 
 /* [Cosmetic] */
@@ -23,13 +23,19 @@ device_front_cr = 2;
 // The radius of the device's back edges.
 device_back_cr = 2;
 
+// The radius of the bottom left and right corners.
+device_bottom_cr = 8;
+
 // The radius of the corner that will descend to the lip.
-screen_bottom_cr = 4;
+lip_side_fillet_cr = 4;
 
 // Offset of the port from the center of the bottom.
 port_x_offset = 0;
 // Y offset is positive ("up") going closer to the face.
 port_y_offset = 0;
+// Z offset is for the port's inset to things like a phone case,
+// raising the plug accordingly.
+port_z_offset = 1.5;
 
 // The width of the USB plug.
 plug_width = 10.7;
@@ -44,8 +50,10 @@ cable_gauge = 4.6;
 
 /* [Tolerances] */
 
-// How much extra space to leave around the device (and through-hole for plug).
+// How much extra space to leave around the device.
 device_tolerance = 1;
+// How much extra space to leave around the through-hole for the plug.
+through_tolerance = 1;
 // How much extra space to leave around the plug.
 plug_tolerance = 0;
 // How much extra space to leave around the cable.
@@ -60,22 +68,32 @@ recline_angle = 15;
 // Should be at least as long as the plug, plus room for the cable to turn.
 chin_height = 32;
 
-back_wall_length = 32;
-left_wall_length = back_wall_length;
-right_wall_length = left_wall_length;
+wall_height = 32;
 // The height of the lip in front of the device.
 lip_height = 10;
 
 // The thickness of the bottom base.
 base_thickness = 5;
 
+// The corner radius of the back corner.
+base_cr = 2;
+
 // The thickness of the walls.
 wall_thickness = 3;
+
+// The radius of the "top" corner.
+side_wall_front_cr = 8;
+side_wall_back_cr = 3;
+
+back_wall_top_cr = 3;
 
 // How wide of a gap to put in the middle of the lip (eg. for a speaker).
 lip_cleft_width = 32;
 // The height of the lip within the cleft (ie. beneath the speaker).
 lip_cleft_height = 4;
+
+lip_cleft_inside_fillet = 2;
+lip_cleft_outside_fillet = 2;
 
 /* [Rendering] */
 
@@ -95,26 +113,25 @@ Assumptions in the current formulation:
 */
 
 device_depth_total = device_depth + 2*device_tolerance;
-dock_depth = device_depth_total + wall_thickness + wall_thickness;
+dock_depth = device_depth_total + 2*wall_thickness;
 device_width_total = device_width + 2*device_tolerance;
-dock_width = device_width_total + wall_thickness + wall_thickness;
-dock_length = back_wall_length + chin_height;
+dock_width = device_width_total + 2*wall_thickness;
+dock_length = wall_height + chin_height;
 plug_width_total = plug_width + plug_tolerance;
 plug_depth_total = plug_depth + plug_tolerance;
 cable_total = cable_gauge + 2*cable_tolerance;
 
-device_carveout_left = -device_width_total/2 -
-  (wall_thickness ? 0 : eps);
-device_carveout_width = device_width_total +
-  (wall_thickness ? 0 : eps) + (wall_thickness ? 0 : eps);
+// How much extra length the dock needs to meet the
+// XY plane when angled.
+chin_hem = tan(recline_angle)*dock_depth/2;
+
+device_carveout_left = -device_width_total/2;
+device_carveout_width = device_width_total;
 device_carveout_above_lip_depth = device_depth_total + wall_thickness + eps;
 device_carveout_above_lip_bottom = chin_height + lip_height;
-device_carveout_above_lip_height = back_wall_length + eps;
+device_carveout_above_lip_height = wall_height + eps;
 device_carveout_cleft_height = lip_height - lip_cleft_height + eps;
 plug_carveout_depth = wall_thickness + port_y_offset + device_depth_total/2;
-
-left_wall_cut = back_wall_length - left_wall_length;
-right_wall_cut = back_wall_length - right_wall_length;
 
 base_length = dock_width * cos(30);
 
@@ -138,13 +155,11 @@ module round_4corners_rect(w,h,tr_r,br_r,bl_r,tl_r) {
 
   // note that these tests assume we don't have any
   // diameter-greater-than-dimension corners
-  if (h==tl_r+bl_r && h==tr_r+br_r) union () {
-    square([w - h, h], center=true);
+  if (h==tl_r+bl_r && h==tr_r+br_r) hull () {
     translate([-w/2 + tr_r, 0]) circle(tr_r);
     translate([w/2 - tr_r, 0]) circle(tr_r);
   }
-  else if (w==tl_r+tr_r && w==bl_r+br_r) union () {
-    square([w, h-w], center=true);
+  else if (w==tl_r+tr_r && w==bl_r+br_r) hull () {
     translate([0,-h/2 + tr_r]) circle(tr_r);
     translate([0,h/2 - tr_r]) circle(tr_r);
   } else hull() {
@@ -155,22 +170,131 @@ module round_4corners_rect(w,h,tr_r,br_r,bl_r,tl_r) {
   }
 }
 
-module round_2corners_rect(w,h,t_r,b_r) {
+module round_tbcorners_rect(w,h,t_r,b_r) {
   round_4corners_rect(w,h,t_r,b_r,b_r,t_r);
+}
+module round_lrcorners_rect(w,h,l_r,r_r) {
+  round_4corners_rect(w,h,r_r,r_r,l_r,l_r);
 }
 
 module round_corner_rect(w,h,r) {
   round_4corners_rect(w,h,r,r,r,r);
 }
 
-module cross_section() {
-  round_2corners_rect(device_width,device_depth,device_back_cr,device_front_cr);
+module device_cross_section() {
+  round_tbcorners_rect(device_width,device_depth,device_back_cr,device_front_cr);
 }
 
-module dock_walls() {
+module dock_perimeter() {
   difference() {
-    offset(r=device_tolerance + wall_thickness) cross_section();
-    offset(r=device_tolerance) cross_section();
+    offset(r=device_tolerance + wall_thickness) device_cross_section();
+    offset(r=device_tolerance) device_cross_section();
+  }
+}
+
+module dock_walls () {
+  translate([0,0,-chin_hem])
+  linear_extrude(chin_hem+chin_height+wall_height, convexity = 10) dock_perimeter();
+}
+
+// TODO: Consider a "flat cuts" option to intersect a (scaled) projection
+//   of the front and back extruded along the Y axis, so that the edge is
+// all printed as one layer
+// (not counting any curves, eg. along the XZ or YZ axis, of course)
+// (ie. you'd have to be careful to put in certain contours on the
+// side intersections to prevent angles from becoming even pointer than
+// 90 degree blunt corners/edges this way
+
+// Maybe it just uses some kind of skew matrix
+
+flat_cuts = false;
+
+module dock_face_common () {
+  wall_cr = back_wall_top_cr;
+  hull () {
+    translate([-dock_width/2 + wall_cr, dock_length - wall_cr]) circle(wall_cr);
+    translate([dock_width/2 - wall_cr, dock_length - wall_cr]) circle(wall_cr);
+    translate([-dock_width/2, flat_cuts ? 0 : -chin_hem])
+      square([dock_width,chin_height]);
+  }
+}
+
+module dock_back_face() {
+  difference() {
+    dock_face_common();
+    translate([0,flat_cuts?0:chin_hem]) {
+      translate([port_x_offset, chin_height + plug_depth/2 + through_tolerance])
+        offset(r=through_tolerance) plughole();
+      translate([-cable_total/2 + port_x_offset, -chin_hem]) 
+        square([cable_total, chin_height+chin_hem+eps]);
+    }
+  }
+}
+
+module fillet(r,o=eps) {
+  difference() {
+    translate([-o,-o]) square(r+o);
+    translate([r,r]) circle(r);
+  }
+}
+
+module dock_front_face() {
+  difference() {
+    dock_face_common();
+    translate([0,flat_cuts?chin_hem:0]) {
+      translate([0, chin_height+lip_height+wall_height/2+lip_side_fillet_cr/2])
+        round_corner_rect(device_width_total,wall_height+lip_side_fillet_cr, lip_side_fillet_cr);
+      translate([0, chin_height+lip_height])
+        round_corner_rect(lip_cleft_width,2*lip_cleft_height, lip_cleft_inside_fillet);
+      translate([lip_cleft_width/2, chin_height+lip_height]) mirror([0,1])
+        fillet(lip_cleft_outside_fillet);
+      translate([-lip_cleft_width/2, chin_height+lip_height]) mirror([1,1])
+        fillet(lip_cleft_outside_fillet);
+    }
+  }
+}
+
+module dockblock_faces() {
+  rotate([90,0,0])
+    multmatrix([[1,0,0,0], [0,1,flat_cuts?-tan(recline_angle):0,0],
+      [0,0,1,0],[0,0,0,1]])
+    union () {
+      linear_extrude(dock_depth/2)
+        dock_front_face();
+      mirror([0,0,1])
+      linear_extrude(dock_depth/2)
+        dock_back_face();
+    }
+}
+
+module dock_chinfill() {
+  difference () {
+    translate([0,0,-chin_hem])
+      linear_extrude(chin_height + chin_hem +
+        max(device_front_cr, device_back_cr,device_bottom_cr))
+      offset(r=device_tolerance) device_cross_section();
+    intersection () {
+      rotate([90,0,90])
+        translate([0,0,-dock_width/2])
+        linear_extrude(dock_width + 2*eps)
+          translate([0,chin_height + wall_height])
+          round_lrcorners_rect(device_depth_total+2*eps,2*wall_height,
+            device_front_cr,device_back_cr);
+      rotate([90,0,0])
+        translate([0,0,-dock_depth/2])
+        linear_extrude(dock_depth + 2*eps)
+          translate([0,chin_height + wall_height])
+          round_corner_rect(device_width_total+2*eps,2*wall_height,
+            device_bottom_cr);
+    }
+    // cable track carveout
+    translate([0,0,-chin_hem]) linear_extrude(chin_height + chin_hem + plug_depth)
+      translate([port_x_offset, port_y_offset-cable_total/2 + dock_depth/2]) 
+      round_corner_rect(cable_total, dock_depth, cable_total/2);
+    // docking plug carveout in chin
+    translate([port_x_offset, port_y_offset,chin_height + port_z_offset])
+      mirror([0,0,1]) linear_extrude(plug_length + eps)
+      offset(r=plug_tolerance) plughole();
   }
 }
 
@@ -189,32 +313,15 @@ module dockblock() {
       linear_extrude(device_depth_total)
       square([device_carveout_width, lip_height + eps]);
 
-    // left wall height carveout
-    if (left_wall_cut && wall_thickness)
-      translate([-dock_width/2 - eps, chin_height + left_wall_length, wall_thickness])
-        linear_extrude(device_carveout_above_lip_depth)
-        square([wall_thickness + 2*eps, left_wall_cut + eps]);
-
-    // right wall height carveout
-    if (right_wall_cut && wall_thickness)
-      translate([dock_width/2 - wall_thickness - eps,
-        chin_height + right_wall_length, wall_thickness])
-          linear_extrude(device_carveout_above_lip_depth)
-          square([wall_thickness + 2*eps, right_wall_cut + eps]);
-
     // lip cleft carveout
     translate([-lip_cleft_width/2, chin_height + lip_cleft_height, wall_thickness])
       linear_extrude(device_carveout_above_lip_depth)
       square([lip_cleft_width, device_carveout_cleft_height]);
 
-    // cable track carveout
-    translate([-cable_total/2 + port_x_offset, 0, -eps]) linear_extrude(plug_carveout_depth + eps)
-      square([cable_total, chin_height + 2*eps]);
-
     // through-hole plug carveout in back
     translate([port_x_offset, chin_height + plug_depth/2 + cable_tolerance, -eps])
       linear_extrude(wall_thickness + 2*eps)
-      offset(r=device_tolerance) plughole();
+      offset(r=through_tolerance) plughole();
 
     // docking plug carveout in chin
     translate([0, chin_height + eps, plug_carveout_depth])
@@ -229,12 +336,56 @@ module dockblock() {
   }
 }
 
+module test_dockblock() {
+  intersection() {
+    translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,40]);
+    translate([0,0,-10]) new_dockblock();
+  }
+}
+
+module dockblock_profile () {
+  hull () {
+    translate([0,chin_height + wall_height/2])
+      round_lrcorners_rect(dock_depth,wall_height,
+        side_wall_front_cr,side_wall_back_cr);
+    polygon([[-dock_depth/2,chin_height],[dock_depth/2,chin_height],
+      [dock_depth/2,chin_hem],[-dock_depth/2,-chin_hem]]);
+  }
+}
+
+module dockblock_bounds () {
+  rotate([90,0,90])
+    translate([0,0,-dock_width/2])
+    linear_extrude(dock_width)
+      dockblock_profile();
+}
+
+module new_dockblock() {
+  union () {
+    intersection() {
+      dock_walls();
+      dockblock_bounds();
+      dockblock_faces();
+    }
+    intersection () {
+      dock_chinfill();
+      dockblock_bounds();
+    }
+  }
+}
+
 module base() {
   translate([-dock_width/2, -base_length/2 - dock_depth / cos(recline_angle), 0]) linear_extrude(base_thickness)
     difference() {
       polygon([[dock_width/2,base_length],[dock_width,0],[0,0]]);
-      // don't cut into the chin
+      
+      // delete part of base extending into the hem of the dock block
+      // TODO: Review:
+     //    Should this maybe just be everything south of the X axis?
+      //   Does dock_depth / cos(recline_angle) scale the height of the dock?
+      //   Is that, in other words? what this does?
       square([dock_width, dock_depth / cos(recline_angle)]);
+      
       translate([dock_width/2 - cable_total/2 + port_x_offset, -eps])
         square([cable_total, base_length + eps]);
     }
@@ -256,6 +407,15 @@ module dockplus() {
     polygon([[-eps, 0],
       [dock_depth / cos(recline_angle), 0],
       [dock_depth * cos(recline_angle), dock_depth * sin(recline_angle)]]);
+}
+
+module new_dockplus() {
+  intersection () {
+    rotate([-recline_angle, 0, 0])
+      new_dockblock();
+    //TODO: Bounding box, I think?
+    // No: work the foot cutoff into the side definition.
+  }
 }
 
 module onepiece() {
@@ -286,5 +446,9 @@ module offstripes() {
 //onepiece();
 
 //dockblock();
+//dock_perimeter();
 //dock_walls();
-plughole();
+//plughole();
+
+//new_dockplus();
+test_dockblock();
