@@ -58,7 +58,7 @@ device_tolerance = .2;
 // How much extra space to leave around the through-hole for the plug.
 through_tolerance = 1;
 // How much extra space to leave around the plug.
-plug_tolerance = 0.1;
+plug_tolerance = 0.15;
 // How much extra space to leave around the cable.
 cable_tolerance = 0;
 
@@ -95,8 +95,8 @@ lip_cleft_width = 32;
 // The height of the lip within the cleft (ie. beneath the speaker).
 lip_cleft_height = 6;
 
-lip_cleft_inside_fillet = 3;
-lip_cleft_outside_fillet = 3;
+lip_cleft_fillet = 3;
+lip_cleft_bevel = 3;
 
 /* [Rendering] */
 
@@ -238,10 +238,6 @@ module backhole() {
 module dock_back_face() {
   difference() {
     dock_face_common();
-    translate([0,flat_cuts?0:chin_hem]) {
-      translate([-cable_total/2 + port_x_offset, -chin_hem]) 
-        square([cable_total, chin_height+chin_hem+eps]);
-    }
   }
 }
 
@@ -259,11 +255,11 @@ module dock_front_face() {
       translate([0, chin_height+lip_height+wall_height/2+screen_cr/2])
         round_corner_rect(screen_width,wall_height+screen_cr, screen_cr);
       translate([0, chin_height+lip_height])
-        round_corner_rect(lip_cleft_width,2*lip_cleft_height, lip_cleft_inside_fillet);
+        round_corner_rect(lip_cleft_width,2*lip_cleft_height, lip_cleft_fillet);
       translate([lip_cleft_width/2, chin_height+lip_height]) mirror([0,1])
-        fillet(lip_cleft_outside_fillet);
+        fillet(lip_cleft_bevel);
       translate([-lip_cleft_width/2, chin_height+lip_height]) mirror([1,1])
-        fillet(lip_cleft_outside_fillet);
+        fillet(lip_cleft_bevel);
     }
   }
 }
@@ -302,9 +298,9 @@ module dock_chinfill() {
             device_bottom_cr);
     }
     // cable track carveout
-    translate([0,0,-chin_hem]) linear_extrude(chin_height + chin_hem + plug_depth)
-      translate([port_x_offset, port_y_offset-cable_total/2 + dock_depth/2]) 
-      round_corner_rect(cable_total, dock_depth, cable_total/2);
+    translate([port_x_offset, port_y_offset, -chin_hem])
+      linear_extrude(chin_height + chin_hem + plug_depth)
+      round_corner_rect(plug_depth + 2*through_tolerance, device_depth+2*device_tolerance, plug_depth/2 + through_tolerance);
     // docking plug carveout in chin
     translate([port_x_offset, port_y_offset,chin_height + port_z_offset])
       mirror([0,0,1]) linear_extrude(plug_length + eps)
@@ -342,7 +338,6 @@ module dockblock() {
         dockblock_bounds();
       }
     }
-    backhole();
   }
 }
 
@@ -364,8 +359,8 @@ module base() {
 
 module test_dockblock() {
   intersection() {
-    translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,30]);
-    translate([0,0,-25]) new_dockblock();
+    translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,50]);
+    translate([0,0,-10]) rotate([recline_angle, 0, 0]) dockblock();
   }
 }
 
@@ -398,9 +393,9 @@ module a_stripes() {
   }
 }
 
-onepiece();
+//onepiece();
 //a_stripes();
 //b_stripes();
 //base();
 
-//test_dockblock();
+test_dockblock();
