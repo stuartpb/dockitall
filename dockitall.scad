@@ -6,7 +6,7 @@
 
 /* [Cosmetic] */
 
-stripe_width = 10;
+stripe_width = 14;
 
 /* [Measurements] */
 
@@ -30,7 +30,7 @@ device_bottom_cr = 8;
 screen_width = 70;
 
 // The radius of the corner that will descend to the lip.
-screen_cr = 5;
+screen_cr = 6;
 
 // Offset of the port from the center of the bottom.
 port_x_offset = 0;
@@ -56,7 +56,7 @@ cable_gauge = 4.6;
 // How much extra space to leave around the device.
 device_tolerance = 0;
 // How much extra space to leave around the through-hole for the plug.
-through_tolerance = 0.5;
+through_tolerance = 1;
 // How much extra space to leave around the plug.
 plug_tolerance = 0.1;
 // How much extra space to leave around the cable.
@@ -102,7 +102,7 @@ lip_cleft_outside_fillet = 3;
 
 // Epsilon value for enveloping differences
 eps = 1/128;
-$fn = 90;
+$fn = 30;
 
 /* [Hidden] */
 
@@ -210,7 +210,7 @@ module dock_walls () {
 
 // Maybe it just uses some kind of skew matrix
 
-flat_cuts = false;
+flat_cuts = true;
 
 module dock_face_common () {
   wall_cr = back_wall_top_cr;
@@ -224,6 +224,8 @@ module dock_face_common () {
 
 module backhole() {
   rotate([90,0,0])
+  multmatrix([[1,0,0,0], [0,1,flat_cuts?-tan(recline_angle):0,0],
+      [0,0,1,0],[0,0,0,1]])
   translate([port_x_offset,
     (flat_cuts ? 0 : chin_hem)+ chin_height + plug_depth/2 + through_tolerance,
     -plug_length])
@@ -237,8 +239,6 @@ module dock_back_face() {
   difference() {
     dock_face_common();
     translate([0,flat_cuts?0:chin_hem]) {
-      translate([port_x_offset, chin_height + plug_depth/2 + through_tolerance])
-        offset(r=through_tolerance) plughole();
       translate([-cable_total/2 + port_x_offset, -chin_hem]) 
         square([cable_total, chin_height+chin_hem+eps]);
     }
@@ -312,13 +312,6 @@ module dock_chinfill() {
   }
 }
 
-module test_dockblock() {
-  intersection() {
-    translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,30]);
-    translate([0,0,-25]) new_dockblock();
-  }
-}
-
 module dockblock_profile () {
   hull () {
     translate([0,chin_height + wall_height/2])
@@ -336,8 +329,8 @@ module dockblock_bounds () {
       dockblock_profile();
 }
 
-module new_dockblock() {
-  difference () {
+module dockblock() {
+  rotate([-recline_angle, 0, 0]) difference () {
     union () {
       intersection() {
         dock_walls();
@@ -354,16 +347,26 @@ module new_dockblock() {
 }
 
 module base() {
+  difference() {
   translate([-dock_width/2, -dock_depth/2, 0]) linear_extrude(base_thickness)
     difference() {
         polygon([[dock_width/2,base_length],[dock_width,0],[0,0]]);
       
       // delete any part of the base that may extend out the front
-      square([dock_width, dock_depth /2]);
+      square([dock_width, dock_depth]);
       
       translate([dock_width/2 - cable_total/2 + port_x_offset, -eps])
         square([cable_total, base_length + eps]);
     }
+    rotate([-recline_angle, 0, 0]) dockblock_bounds();
+  }
+}
+
+module test_dockblock() {
+  intersection() {
+    translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,30]);
+    translate([0,0,-25]) new_dockblock();
+  }
 }
 
 module striping() {
@@ -372,50 +375,32 @@ module striping() {
   }
 }
 
-module dockplus() {
-  union () {
-    translate([0, -base_length/2, 0]) rotate([90 - recline_angle, 0, 0])
-      dockblock();
-  }
-  // frontal foot between base and dock
-  translate([dock_width/2, -base_length/2, 0]) rotate([90, 0, -90]) linear_extrude(dock_width)
-    polygon([[-eps, 0],
-      [dock_depth / cos(recline_angle), 0],
-      [dock_depth * cos(recline_angle), dock_depth * sin(recline_angle)]]);
-}
-
 module onepiece() {
   union () {
-    rotate([-recline_angle, 0, 0])
-      new_dockblock();
+    dockblock();
     base();
   }
 }
 
-module basestripes() {
+module b_stripes() {
   union () {
     intersection () {
-      dockplus();
+      dockblock();
       striping();
     }
-    base();
   }
 }
 
-module offstripes() {
+module a_stripes() {
   difference () {
-    dockplus();
+    dockblock();
     striping();
-    base();
   }
 }
 
-//onepiece();
+onepiece();
+//a_stripes();
+//b_stripes();
+//base();
 
-//dockblock();
-//dock_perimeter();
-//dock_walls();
-//plughole();
-
-//onepiece();
-test_dockblock();
+//test_dockblock();
