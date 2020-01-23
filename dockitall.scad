@@ -27,10 +27,10 @@ device_back_cr = 5;
 device_bottom_cr = 8;
 
 // The width of the front opening for the screen.
-screen_width = 70;
+screen_width = 72;
 
 // The radius of the corner that will descend to the lip.
-screen_cr = 6;
+screen_cr = 5.5;
 
 // Offset of the port from the center of the bottom.
 port_x_offset = 0;
@@ -54,7 +54,7 @@ cable_gauge = 4.6;
 /* [Tolerances] */
 
 // How much extra space to leave around the device.
-device_tolerance = 0;
+device_tolerance = .2;
 // How much extra space to leave around the through-hole for the plug.
 through_tolerance = 1;
 // How much extra space to leave around the plug.
@@ -102,7 +102,7 @@ lip_cleft_outside_fillet = 3;
 
 // Epsilon value for enveloping differences
 eps = 1/128;
-$fn = 30;
+$fn=24;
 
 /* [Hidden] */
 
@@ -190,8 +190,8 @@ module device_cross_section() {
 
 module dock_perimeter() {
   difference() {
-    offset(r=device_tolerance + wall_thickness) device_cross_section();
-    offset(r=device_tolerance) device_cross_section();
+    offset(delta=device_tolerance + wall_thickness) device_cross_section();
+    offset(delta=device_tolerance) device_cross_section();
   }
 }
 
@@ -231,7 +231,7 @@ module backhole() {
     -plug_length])
   
     linear_extrude(plug_length)
-    offset(r=through_tolerance)
+    offset(delta=through_tolerance)
     plughole();
 }
 
@@ -286,7 +286,7 @@ module dock_chinfill() {
     translate([0,0,-chin_hem])
       linear_extrude(chin_height + chin_hem +
         max(device_front_cr, device_back_cr,device_bottom_cr))
-      offset(r=device_tolerance) device_cross_section();
+      offset(delta=device_tolerance) device_cross_section();
     intersection () {
       rotate([90,0,90])
         translate([0,0,-dock_width/2])
@@ -308,7 +308,7 @@ module dock_chinfill() {
     // docking plug carveout in chin
     translate([port_x_offset, port_y_offset,chin_height + port_z_offset])
       mirror([0,0,1]) linear_extrude(plug_length + eps)
-      offset(r=plug_tolerance) plughole();
+      offset(delta=plug_tolerance) plughole();
   }
 }
 
