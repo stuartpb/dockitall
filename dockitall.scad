@@ -237,14 +237,21 @@ module backhole() {
 
 module throughhole() {
   through_r = plug_radius+through_tolerance;
-  angle = asin((device_depth_total/2-through_r)/(plug_width/2 - through_r));
+  xshift = (plug_width+2*through_tolerance)-device_depth_total;
   translate([port_x_offset, port_y_offset, -chin_hem])
     linear_extrude(chin_height + chin_hem + plug_depth)
     union () {
-      rotate([0,0,/*57*/90+angle/2]) offset(delta=through_tolerance) plughole();
-      rotate([0,0,/*57*/90-angle/2]) offset(delta=through_tolerance) plughole();
-      #square([plug_depth*1.5*cos(angle),device_depth_total], center=true);
+      hull() {
+        translate([xshift,device_depth_total/2-through_r]) circle(through_r);
+        translate([-xshift,-device_depth_total/2+through_r]) circle(through_r);
+      }
+      hull() {
+        translate([-xshift,device_depth_total/2-through_r]) circle(through_r);
+        translate([xshift,-device_depth_total/2+through_r]) circle(through_r);
+      }
+      square([2*xshift,device_depth_total], center=true);
     }
+  rotate([0,0,30]) #square([through_r*2,plug_width+2*through_tolerance], center=true);
 }
 
 module dock_back_face() {
