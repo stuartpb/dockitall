@@ -54,11 +54,11 @@ cable_gauge = 4.6;
 /* [Tolerances] */
 
 // How much extra space to leave around the device.
-device_tolerance = .2;
+device_tolerance = .1;
 // How much extra space to leave around the through-hole for the plug.
-through_tolerance = 1;
+through_tolerance = .2;
 // How much extra space to leave around the plug.
-plug_tolerance = 0.15;
+plug_tolerance = 0.05;
 // How much extra space to leave around the cable.
 cable_tolerance = 0;
 
@@ -235,6 +235,18 @@ module backhole() {
     plughole();
 }
 
+module throughhole() {
+  through_r = plug_radius+through_tolerance;
+  angle = asin((device_depth_total/2-through_r)/(plug_width/2 - through_r));
+  translate([port_x_offset, port_y_offset, -chin_hem])
+    linear_extrude(chin_height + chin_hem + plug_depth)
+    union () {
+      rotate([0,0,/*57*/90+angle/2]) offset(delta=through_tolerance) plughole();
+      rotate([0,0,/*57*/90-angle/2]) offset(delta=through_tolerance) plughole();
+      #square([plug_depth*1.5*cos(angle),device_depth_total], center=true);
+    }
+}
+
 module dock_back_face() {
   difference() {
     dock_face_common();
@@ -297,10 +309,7 @@ module dock_chinfill() {
           round_corner_rect(device_width_total+2*eps,2*wall_height,
             device_bottom_cr);
     }
-    // cable track carveout
-    translate([port_x_offset, port_y_offset, -chin_hem])
-      linear_extrude(chin_height + chin_hem + plug_depth)
-      round_corner_rect(plug_depth + 2*through_tolerance, device_depth+2*device_tolerance, plug_depth/2 + through_tolerance);
+
     // docking plug carveout in chin
     translate([port_x_offset, port_y_offset,chin_height + port_z_offset])
       mirror([0,0,1]) linear_extrude(plug_length + eps)
@@ -338,6 +347,7 @@ module dockblock() {
         dockblock_bounds();
       }
     }
+    throughhole();
   }
 }
 
@@ -359,7 +369,7 @@ module base() {
 
 module test_dockblock() {
   intersection() {
-    translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,50]);
+    translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,40]);
     translate([0,0,-10]) rotate([recline_angle, 0, 0]) dockblock();
   }
 }
