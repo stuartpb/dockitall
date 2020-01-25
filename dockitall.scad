@@ -232,16 +232,17 @@ module backhole() {
 
 module throughhole() {
   through_r = plug_radius+through_tolerance;
-  hypo = sqrt(pow(plug_width/2 - plug_radius,2) + pow(plug_depth/2-plug_radius,2));
-  ratio = (device_depth_total/2-through_r)/hypo;
-  angle = asin(ratio)*(plug_radius/(plug_depth/2))+acos(ratio)*(plug_depth-2*plug_radius)/plug_depth;
-  echo((device_depth_total/2-through_r),hypo,ratio,angle,cos(angle));
+  a = plug_width/2 - plug_radius;
+  b = plug_depth/2 - plug_radius;
+  hypo = sqrt(a*a+b*b);
+  tilt = asin((device_depth_total/2-through_r)/hypo);
+  angle = tilt-atan(b/a);
   translate([port_x_offset, port_y_offset, -chin_hem])
     linear_extrude(chin_height + chin_hem + plug_depth)
     union () {
       rotate(angle) offset(delta=through_tolerance) plughole($fn=24);
       rotate(-angle) offset(delta=through_tolerance) plughole($fn=24);
-      square([cos(angle) * 2 * (hypo+through_tolerance) ,device_depth_total], center=true);
+      square([cos(tilt) * 2 * (hypo+through_tolerance),device_depth_total], center=true);
     }
 }
 
@@ -432,13 +433,12 @@ module test_wedge () {
   echo([[0,0],each curve_points([0,0],[8,8])]);
 }
 
-//onepiece();
-//round_4corners_rect(40,40,4,4,4,4);
+onepiece();
 
 //a_stripes();
 //b_stripes();
 //base_plate();
 
-test_dockblock();
+//test_dockblock();
 //cable_test();
 //test_wedge();
