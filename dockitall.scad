@@ -65,7 +65,7 @@ cable_tolerance = 0;
 /* [Parameters] */
 
 // Whether front and back cuts should be level relative to the base.
-flat_cuts = false;//true;
+flat_cuts = true;
 
 // Whether the cable should be laid into the case from the back.
 open_channel = false;
@@ -108,7 +108,10 @@ lip_cleft_bevel = 3;
 
 // Epsilon value for enveloping differences
 eps = 1/128;
-$fn=24;
+//$fn=24;
+
+$fa = 1;
+$fs = 2;
 
 /* [Hidden] */
 
@@ -427,10 +430,32 @@ module a_stripes() {
   }
 }
 
-onepiece();
+function curve_points(o,d,$fs=$fs,$fa=$fa,$fn=$fn) =
+  // from 0, incrementing by a fraction of facets
+  [for (i=[0:1/(
+    // defaulting to $fn/4 rounded up (if defined)
+    $fn>0 ? ceil($fn/4)
+      // or (at least 4)
+      : ceil(max(4,
+        // not exceeding the $fa limit
+        min(360/$fa,
+          max(abs(d[0]),abs(d[1]))*2*PI/$fs)
+        )/4))
+    // incrementing up to 1
+    :1])
+  // each coordinate in the curve
+    [o[0]+sin(i*90)*d[0],o[1]+cos(i*90)*d[1]]];
+
+module test_wedge () {
+  polygon([[0,0],each curve_points([0,0],[-8,-8])]);
+  echo([[0,0],each curve_points([0,0],[1,1])]);
+}
+
+//onepiece();
 //a_stripes();
 //b_stripes();
 //base_plate();
 
 //test_dockblock();
 //cable_test();
+test_wedge();
