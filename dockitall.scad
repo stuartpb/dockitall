@@ -111,7 +111,7 @@ eps = 1/128;
 //$fn=24;
 
 $fa = 1;
-$fs = 2;
+$fs = 1;
 
 /* [Hidden] */
 
@@ -147,39 +147,33 @@ plug_carveout_depth = wall_thickness + port_y_offset + device_depth_total/2;
 
 base_length = dock_width * cos(30);
 
-module plughole() {
-  round_corner_rect(plug_width,plug_depth,plug_radius);
-}
+function curve_points(o,d,cw=true) =
+  // number of facets for 1/4 circle ($fn if defined)
+  let (n=ceil(($fn>0 ? $fn
+    // if $fn is not defined, either the maximum under $fa,
+    : min(360/$fa,
+      // or the number of facets for $fs at this size
+      max(abs(d[0]),abs(d[1])) * 2*PI/$fs)
+    )/4),xy = ((d[0]>0) == (d[1]>0)) == cw)
+  // for each point on the curve,
+  [for (i=[(xy?0:n) : (xy?1:-1) : (xy?n:0)])
+  // return its coordinate
+    [o[0]+sin(90*(i/n))*d[0], o[1]+cos(90*(i/n))*d[1]]];
 
 module round_4corners_rect(w,h,tr_r,br_r,bl_r,tl_r) {
+  assert(w>=max(br_r+bl_r,tl_r+tr_r));
+  assert(h>=max(tr_r+br_r,bl_r+tl_r));
 
-  // assuming all round corners and no corners with a diameter
-  // greater than a dimension of the rect
-  assert(min(w,h)>=2*max(tr_r,br_r,bl_r,tl_r));
-  assert(0<max(tr_r,br_r,bl_r,tl_r));
-
-  // a simple hulling variant (ie. passing first condition/assumption)
-  // that could handle square corners (ie. failing second test)
-  // could do this test
-  //assert(min(w,h)>=max(tr_r+br_r,br_r+bl_r,bl_r+tl_r,tl_r+tr_r))
-  // it could be still used safely with the 2-circle-and-square path,
-  // because all 4 corners need to be equal for those
-
-  // note that these tests assume we don't have any
-  // diameter-greater-than-dimension corners
-  if (h==tl_r+bl_r && h==tr_r+br_r) hull () {
-    translate([-w/2 + tr_r, 0]) circle(tr_r);
-    translate([w/2 - tr_r, 0]) circle(tr_r);
-  }
-  else if (w==tl_r+tr_r && w==bl_r+br_r) hull () {
-    translate([0,-h/2 + tr_r]) circle(tr_r);
-    translate([0,h/2 - tr_r]) circle(tr_r);
-  } else hull() {
-    translate([w/2-tr_r,h/2-tr_r]) circle(tr_r);
-    translate([w/2-br_r,-h/2+br_r]) circle(br_r);
-    translate([-w/2+bl_r,-h/2+bl_r]) circle(bl_r);
-    translate([-w/2+tl_r,h/2-tl_r]) circle(tl_r);
-  }
+  if (w>0 && h>0) polygon([
+    each (tr_r > 0 ? curve_points([w/2 - tr_r, h/2 - tr_r],
+      [tr_r, tr_r]) : [[w/2, h/2]]),
+    each (br_r > 0 ? curve_points([w/2 - br_r, -h/2 + br_r],
+      [br_r, -br_r]) : [[w/2, -h/2]]),
+    each (bl_r > 0 ? curve_points([-w/2 + bl_r, -h/2 + bl_r],
+      [-bl_r, -bl_r]) : [[-w/2, -h/2]]),
+    each (tl_r > 0 ? curve_points([-w/2 + tl_r, h/2 - tl_r],
+      [-tl_r, tl_r]) : [[-w/2, h/2]])
+  ]);
 }
 
 module round_tbcorners_rect(w,h,t_r,b_r) {
@@ -219,6 +213,10 @@ module dock_face_common () {
   }
 }
 
+module plughole() {
+  round_corner_rect(plug_width,plug_depth,plug_radius);
+}
+
 module backhole() {
   rotate([90,0,0])
   multmatrix([[1,0,0,0], [0,1,flat_cuts?-tan(recline_angle):0,0],
@@ -234,14 +232,16 @@ module backhole() {
 
 module throughhole() {
   through_r = plug_radius+through_tolerance;
-  angle = asin((device_depth_total/2-through_r)/(plug_width/2 - plug_radius));
-  echo(angle,cos(angle));
+  hypo = sqrt(pow(plug_width/2 - plug_radius,2) + pow(plug_depth/2-plug_radius,2));
+  ratio = (device_depth_total/2-through_r)/hypo;
+  angle = asin(ratio)*(plug_radius/(plug_depth/2))+acos(ratio)*(plug_depth-2*plug_radius)/plug_depth;
+  echo((device_depth_total/2-through_r),hypo,ratio,angle,cos(angle));
   translate([port_x_offset, port_y_offset, -chin_hem])
     linear_extrude(chin_height + chin_hem + plug_depth)
     union () {
-      rotate(angle) offset(delta=through_tolerance) plughole();
-      rotate(-angle) offset(delta=through_tolerance) plughole();
-      square([cos(angle) * (plug_width - 2*plug_radius),device_depth_total], center=true);
+      rotate(angle) offset(delta=through_tolerance) plughole($fn=24);
+      rotate(-angle) offset(delta=through_tolerance) plughole($fn=24);
+      square([cos(angle) * 2 * (hypo+through_tolerance) ,device_depth_total], center=true);
     }
 }
 
@@ -252,10 +252,7 @@ module dock_back_face() {
 }
 
 module fillet(r,o=eps) {
-  difference() {
-    translate([-o,-o]) square(r+o);
-    translate([r,r]) circle(r);
-  }
+  polygon([[0,0],each curve_points([r+eps,r+eps],[-r-eps,-r-eps])]);
 }
 
 module dock_front_face() {
@@ -430,32 +427,18 @@ module a_stripes() {
   }
 }
 
-function curve_points(o,d,$fs=$fs,$fa=$fa,$fn=$fn) =
-  // from 0, incrementing by a fraction of facets
-  [for (i=[0:1/(
-    // defaulting to $fn/4 rounded up (if defined)
-    $fn>0 ? ceil($fn/4)
-      // or (at least 4)
-      : ceil(max(4,
-        // not exceeding the $fa limit
-        min(360/$fa,
-          max(abs(d[0]),abs(d[1]))*2*PI/$fs)
-        )/4))
-    // incrementing up to 1
-    :1])
-  // each coordinate in the curve
-    [o[0]+sin(i*90)*d[0],o[1]+cos(i*90)*d[1]]];
-
 module test_wedge () {
   polygon([[0,0],each curve_points([0,0],[-8,-8])]);
-  echo([[0,0],each curve_points([0,0],[1,1])]);
+  echo([[0,0],each curve_points([0,0],[8,8])]);
 }
 
 //onepiece();
+//round_4corners_rect(40,40,4,4,4,4);
+
 //a_stripes();
 //b_stripes();
 //base_plate();
 
-//test_dockblock();
+test_dockblock();
 //cable_test();
-test_wedge();
+//test_wedge();
