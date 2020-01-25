@@ -49,20 +49,26 @@ plug_radius = plug_depth/2;
 // The length of the plug before tapering off to the cable.
 plug_length = 18;
 // The diameter of the cable immediately following the end of the plug.
-cable_gauge = 4.6;
+cable_gauge = 3.5;//4.6;
 
 /* [Tolerances] */
 
 // How much extra space to leave around the device.
-device_tolerance = .1;
+device_tolerance = .05;
 // How much extra space to leave around the through-hole for the plug.
-through_tolerance = .2;
+through_tolerance = .1;
 // How much extra space to leave around the plug.
 plug_tolerance = 0;
 // How much extra space to leave around the cable.
 cable_tolerance = 0;
 
 /* [Parameters] */
+
+// Whether front and back cuts should be level relative to the base.
+flat_cuts = false;//true;
+
+// Whether the cable should be laid into the case from the back.
+open_channel = false;
 
 // What angle to recline the phone at (from a straight-up zero degrees).
 recline_angle = 15;
@@ -200,18 +206,6 @@ module dock_walls () {
   linear_extrude(chin_hem+chin_height+wall_height, convexity = 10) dock_perimeter();
 }
 
-// TODO: Consider a "flat cuts" option to intersect a (scaled) projection
-//   of the front and back extruded along the Y axis, so that the edge is
-// all printed as one layer
-// (not counting any curves, eg. along the XZ or YZ axis, of course)
-// (ie. you'd have to be careful to put in certain contours on the
-// side intersections to prevent angles from becoming even pointer than
-// 90 degree blunt corners/edges this way
-
-// Maybe it just uses some kind of skew matrix
-
-flat_cuts = true;
-
 module dock_face_common () {
   wall_cr = back_wall_top_cr;
   hull () {
@@ -242,8 +236,8 @@ module throughhole() {
   translate([port_x_offset, port_y_offset, -chin_hem])
     linear_extrude(chin_height + chin_hem + plug_depth)
     union () {
-      rotate([0,0,angle]) offset(delta=through_tolerance) plughole();
-      rotate([0,0,-angle]) offset(delta=through_tolerance) plughole();
+      rotate(angle) offset(delta=through_tolerance) plughole();
+      rotate(-angle) offset(delta=through_tolerance) plughole();
       square([cos(angle) * (plug_width - 2*plug_radius),device_depth_total], center=true);
     }
 }
@@ -335,8 +329,39 @@ module dockblock_bounds () {
       dockblock_profile();
 }
 
+module base_footprint () {
+  intersection () {
+    translate([-dock_width/2, -dock_depth/2, 0])
+      polygon([[dock_width/2,base_length],[dock_width,0],[0,0]]);
+    union () {
+      offset(delta=device_tolerance) device_cross_section();
+      translate([-dock_width/2, 0, 0])
+        square([dock_width,base_length - dock_depth/2 -
+          sqrt(2*device_front_cr*device_front_cr)]);
+      translate([0,base_length - dock_depth/2 - 2*device_front_cr])
+        circle(device_front_cr);
+    }
+  }
+}
+
+module base_plate() {
+  difference() {
+    linear_extrude(base_thickness) base_footprint();
+    if (open_channel) {
+      linear_extrude(base_thickness)
+      translate([dock_width/2 - cable_total/2 + port_x_offset, -eps])
+        square([cable_total, base_length + eps]);
+    }
+    rotate([-recline_angle, 0, 0]) throughhole();
+    rotate([90,0,0]) mirror([0,0,1]) linear_extrude(base_length) union() {
+      translate([0,cable_total/2]) circle(d=cable_total);
+      square(cable_total, center=true);
+    }
+  }
+}
+
 module dockblock() {
-  rotate([-recline_angle, 0, 0]) difference () {
+  difference () {
     union () {
       intersection() {
         dock_walls();
@@ -352,26 +377,24 @@ module dockblock() {
   }
 }
 
-module base() {
-  difference() {
-  translate([-dock_width/2, -dock_depth/2, 0]) linear_extrude(base_thickness)
-    difference() {
-        polygon([[dock_width/2,base_length],[dock_width,0],[0,0]]);
-      
-      // delete any part of the base that may extend out the front
-      square([dock_width, dock_depth]);
-      
-      translate([dock_width/2 - cable_total/2 + port_x_offset, -eps])
-        square([cable_total, base_length + eps]);
-    }
-    rotate([-recline_angle, 0, 0]) dockblock_bounds();
+module dock_assembly () {
+  difference () {
+    rotate([-recline_angle, 0, 0]) dockblock();
+    translate([0,0,-eps]) linear_extrude(base_thickness+eps) base_footprint();
   }
 }
 
 module test_dockblock() {
   intersection() {
     translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,40]);
-    translate([0,0,-10]) rotate([recline_angle, 0, 0]) dockblock();
+    translate([0,0,-10]) dockblock();
+  }
+}
+
+module cable_test() { 
+  intersection() {
+    base_plate();
+    translate([0,20]) cylinder(r=10, h=6);
   }
 }
 
@@ -383,15 +406,15 @@ module striping() {
 
 module onepiece() {
   union () {
-    dockblock();
-    base();
+    dock_assembly();
+    base_plate();
   }
 }
 
 module b_stripes() {
   union () {
     intersection () {
-      dockblock();
+      dock_assembly();
       striping();
     }
   }
@@ -399,7 +422,7 @@ module b_stripes() {
 
 module a_stripes() {
   difference () {
-    dockblock();
+    dock_assembly();
     striping();
   }
 }
@@ -407,6 +430,7 @@ module a_stripes() {
 onepiece();
 //a_stripes();
 //b_stripes();
-//base();
+//base_plate();
 
 //test_dockblock();
+//cable_test();
