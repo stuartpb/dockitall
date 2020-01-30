@@ -19,9 +19,9 @@ device_width = 80;
 device_depth = 10;
 
 // The radius of the device's front edges.
-device_front_cr = 3;
+device_front_edge_bevel = 3;
 // The radius of the device's back edges.
-device_back_cr = 5;
+device_back_edge_bevel = 5;
 
 // The radius of the bottom left and right corners.
 device_bottom_cr = 8;
@@ -77,7 +77,6 @@ recline_angle = 15;
 // Should be at least as long as the plug, plus room for the cable to turn.
 chin_height = 32;
 
-wall_height = 32;
 // The height of the lip in front of the device.
 lip_height = 10;
 
@@ -85,16 +84,14 @@ lip_height = 10;
 base_thickness = 5;
 
 // The corner radius of the back corner.
-base_cr = 2;
+base_cr = device_front_edge_bevel;
 
 // The thickness of the walls.
 wall_thickness = 3;
 
 // The radius of the "top" corner.
-side_wall_front_cr = 8;
-side_wall_back_cr = 3;
-
-back_wall_top_cr = 3;
+cheek_front_edge_bevel = 8;
+cheek_back_edge_bevel = 3;
 
 // How wide of a gap to put in the middle of the lip (eg. for a speaker).
 lip_cleft_width = 32;
@@ -103,6 +100,15 @@ lip_cleft_height = 6;
 
 lip_cleft_fillet = 3;
 lip_cleft_bevel = 3;
+
+// The height above the lip that the cheeck extends around the front.
+front_cheek_height = (screen_width-lip_cleft_width)/2;
+front_cheek_bevel = 3;
+front_top_corner_bevel = 5;
+
+back_height = 60;
+back_cheek_height = back_height;
+back_top_corner_bevel = 3;
 
 /* [Rendering] */
 
@@ -128,6 +134,7 @@ device_depth_total = device_depth + 2*device_tolerance;
 dock_depth = device_depth_total + 2*wall_thickness;
 device_width_total = device_width + 2*device_tolerance;
 dock_width = device_width_total + 2*wall_thickness;
+wall_height = lip_height + front_cheek_height; // TODO: use back height
 dock_length = wall_height + chin_height;
 plug_width_total = plug_width + plug_tolerance;
 plug_depth_total = plug_depth + plug_tolerance;
@@ -136,14 +143,6 @@ cable_total = cable_gauge + 2*cable_tolerance;
 // How much extra length the dock needs to meet the
 // XY plane when angled.
 chin_hem = tan(recline_angle)*dock_depth/2;
-
-device_carveout_left = -device_width_total/2;
-device_carveout_width = device_width_total;
-device_carveout_above_lip_depth = device_depth_total + wall_thickness + eps;
-device_carveout_above_lip_bottom = chin_height + lip_height;
-device_carveout_above_lip_height = wall_height + eps;
-device_carveout_cleft_height = lip_height - lip_cleft_height + eps;
-plug_carveout_depth = wall_thickness + port_y_offset + device_depth_total/2;
 
 base_length = dock_width * cos(30);
 
@@ -188,7 +187,7 @@ module round_corner_rect(w,h,r) {
 }
 
 module device_cross_section() {
-  round_tbcorners_rect(device_width,device_depth,device_back_cr,device_front_cr);
+  round_tbcorners_rect(device_width,device_depth,device_back_edge_bevel,device_front_edge_bevel);
 }
 
 module dock_perimeter() {
@@ -204,7 +203,7 @@ module dock_walls () {
 }
 
 module dock_face_common () {
-  wall_cr = back_wall_top_cr;
+  wall_cr = back_top_corner_bevel;
   hull () {
     translate([-dock_width/2 + wall_cr, dock_length - wall_cr]) circle(wall_cr);
     translate([dock_width/2 - wall_cr, dock_length - wall_cr]) circle(wall_cr);
@@ -231,19 +230,25 @@ module backhole() {
 }
 
 module throughhole() {
-  through_r = plug_radius+through_tolerance;
-  a = plug_width/2 - plug_radius;
-  b = plug_depth/2 - plug_radius;
-  hypo = sqrt(a*a+b*b);
-  tilt = asin((device_depth_total/2-through_r)/hypo);
-  angle = tilt-atan(b/a);
-  translate([port_x_offset, port_y_offset, -chin_hem])
-    linear_extrude(chin_height + chin_hem + plug_depth)
-    union () {
-      rotate(angle) offset(delta=through_tolerance) plughole($fn=24);
-      rotate(-angle) offset(delta=through_tolerance) plughole($fn=24);
-      square([cos(tilt) * 2 * (hypo+through_tolerance),device_depth_total], center=true);
-    }
+  if (plug_width + 2*through_tolerance > device_depth_total) {
+    through_r = plug_radius+through_tolerance;
+    a = plug_width/2 - plug_radius;
+    b = plug_depth/2 - plug_radius;
+    hypo = sqrt(a*a+b*b);
+    tilt = asin((device_depth_total/2-through_r)/hypo);
+    angle = tilt-atan(b/a);
+    translate([port_x_offset, port_y_offset, -chin_hem])
+      linear_extrude(chin_height + chin_hem + plug_depth)
+      union () {
+        rotate(angle) offset(delta=through_tolerance) plughole($fn=24);
+        rotate(-angle) offset(delta=through_tolerance) plughole($fn=24);
+        square([cos(tilt) * 2 * (hypo+through_tolerance),device_depth_total], center=true);
+      }
+  } else {
+    translate([port_x_offset, port_y_offset, -chin_hem])
+      linear_extrude(chin_height + chin_hem + plug_depth)
+        rotate(90) offset(delta=through_tolerance) plughole($fn=24);
+  }
 }
 
 module dock_back_face() {
@@ -289,7 +294,7 @@ module dock_chinfill() {
   difference () {
     translate([0,0,-chin_hem])
       linear_extrude(chin_height + chin_hem +
-        max(device_front_cr, device_back_cr,device_bottom_cr))
+        max(device_front_edge_bevel, device_back_edge_bevel,device_bottom_cr))
       offset(delta=device_tolerance) device_cross_section();
     intersection () {
       rotate([90,0,90])
@@ -297,7 +302,7 @@ module dock_chinfill() {
         linear_extrude(dock_width + 2*eps)
           translate([0,chin_height + wall_height])
           round_lrcorners_rect(device_depth_total+2*eps,2*wall_height,
-            device_front_cr,device_back_cr);
+            device_front_edge_bevel,device_back_edge_bevel);
       rotate([90,0,0])
         translate([0,0,-dock_depth/2])
         linear_extrude(dock_depth + 2*eps)
@@ -317,7 +322,7 @@ module dockblock_profile () {
   hull () {
     translate([0,chin_height + wall_height/2])
       round_lrcorners_rect(dock_depth,wall_height,
-        side_wall_front_cr,side_wall_back_cr);
+        cheek_front_edge_bevel,cheek_back_edge_bevel);
     polygon([[-dock_depth/2,chin_height],[dock_depth/2,chin_height],
       [dock_depth/2,chin_hem],[-dock_depth/2,-chin_hem]]);
   }
@@ -338,9 +343,9 @@ module base_footprint () {
       offset(delta=device_tolerance) device_cross_section();
       translate([-dock_width/2, 0, 0])
         square([dock_width,base_length - dock_depth/2 -
-          sqrt(2*device_front_cr*device_front_cr)]);
-      translate([0,base_length - dock_depth/2 - 2*device_front_cr])
-        circle(device_front_cr);
+          sqrt(2*device_front_edge_bevel*device_front_edge_bevel)]);
+      translate([0,base_length - dock_depth/2 - 2*device_front_edge_bevel])
+        circle(base_cr);
     }
   }
 }
