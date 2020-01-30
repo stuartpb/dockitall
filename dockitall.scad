@@ -65,7 +65,8 @@ cable_tolerance = 0;
 /* [Parameters] */
 
 // Whether front and back cuts should be level relative to the base.
-flat_cuts = true;
+// TODO: Fix this (skew vs. rotate profile)
+flat_cuts = false;
 
 // Whether the cable should be laid into the case from the back.
 open_channel = false;
@@ -101,13 +102,17 @@ lip_cleft_height = 6;
 lip_cleft_fillet = 3;
 lip_cleft_bevel = 3;
 
-// The height above the lip that the cheeck extends around the front.
+// The height above the lip that the cheek extends around the front.
 front_cheek_height = (screen_width-lip_cleft_width)/2;
-front_cheek_bevel = 3;
+front_cheek_bevel = 0;
 front_top_corner_bevel = 5;
+// The radius of the curve to the front.
+front_fillet = 5;
 
-back_height = 60;
+back_height = 50;
 back_cheek_height = back_height;
+
+//TODO: Separate this between face and profile corners?
 back_top_corner_bevel = 3;
 
 /* [Rendering] */
@@ -134,8 +139,7 @@ device_depth_total = device_depth + 2*device_tolerance;
 dock_depth = device_depth_total + 2*wall_thickness;
 device_width_total = device_width + 2*device_tolerance;
 dock_width = device_width_total + 2*wall_thickness;
-wall_height = lip_height + front_cheek_height; // TODO: use back height
-dock_length = wall_height + chin_height;
+dock_length = back_height + chin_height;
 plug_width_total = plug_width + plug_tolerance;
 plug_depth_total = plug_depth + plug_tolerance;
 cable_total = cable_gauge + 2*cable_tolerance;
@@ -147,31 +151,32 @@ chin_hem = tan(recline_angle)*dock_depth/2;
 base_length = dock_width * cos(30);
 
 function curve_points(o,d,cw=true) =
-  // number of facets for 1/4 circle ($fn if defined)
-  let (n=ceil(($fn>0 ? $fn
-    // if $fn is not defined, either the maximum under $fa,
-    : min(360/$fa,
-      // or the number of facets for $fs at this size
-      max(abs(d[0]),abs(d[1])) * 2*PI/$fs)
-    )/4),xy = ((d[0]>0) == (d[1]>0)) == cw)
-  // for each point on the curve,
-  [for (i=[(xy?0:n) : (xy?1:-1) : (xy?n:0)])
-  // return its coordinate
-    [o[0]+sin(90*(i/n))*d[0], o[1]+cos(90*(i/n))*d[1]]];
+  (abs(d[0]) > 0 && abs(d[1]) > 0) ?
+    // number of facets for 1/4 circle ($fn if defined)
+    (let (n=ceil(($fn>0 ? $fn
+      // if $fn is not defined, either the maximum under $fa,
+      : min(360/$fa,
+        // or the number of facets for $fs at this size
+        max(abs(d[0]),abs(d[1])) * 2*PI/$fs)
+      )/4),xy = ((d[0]>0) == (d[1]>0)) == cw)
+    // for each point on the curve,
+    [for (i=[(xy?0:n) : (xy?1:-1) : (xy?n:0)])
+    // return its coordinate
+      [o[0]+sin(90*(i/n))*d[0], o[1]+cos(90*(i/n))*d[1]]]) : [o];
 
 module round_4corners_rect(w,h,tr_r,br_r,bl_r,tl_r) {
   assert(w>=max(br_r+bl_r,tl_r+tr_r));
   assert(h>=max(tr_r+br_r,bl_r+tl_r));
 
   if (w>0 && h>0) polygon([
-    each (tr_r > 0 ? curve_points([w/2 - tr_r, h/2 - tr_r],
-      [tr_r, tr_r]) : [[w/2, h/2]]),
-    each (br_r > 0 ? curve_points([w/2 - br_r, -h/2 + br_r],
-      [br_r, -br_r]) : [[w/2, -h/2]]),
-    each (bl_r > 0 ? curve_points([-w/2 + bl_r, -h/2 + bl_r],
-      [-bl_r, -bl_r]) : [[-w/2, -h/2]]),
-    each (tl_r > 0 ? curve_points([-w/2 + tl_r, h/2 - tl_r],
-      [-tl_r, tl_r]) : [[-w/2, h/2]])
+    each curve_points(
+      [w/2 - tr_r, h/2 - tr_r], [tr_r, tr_r]),
+    each curve_points(
+      [w/2 - br_r, -h/2 + br_r], [br_r, -br_r]),
+    each curve_points(
+      [-w/2 + bl_r, -h/2 + bl_r], [-bl_r, -bl_r]),
+    each curve_points(
+      [-w/2 + tl_r, h/2 - tl_r], [-tl_r, tl_r])
   ]);
 }
 
@@ -199,17 +204,7 @@ module dock_perimeter() {
 
 module dock_walls () {
   translate([0,0,-chin_hem])
-  linear_extrude(chin_hem+chin_height+wall_height, convexity = 10) dock_perimeter();
-}
-
-module dock_face_common () {
-  wall_cr = back_top_corner_bevel;
-  hull () {
-    translate([-dock_width/2 + wall_cr, dock_length - wall_cr]) circle(wall_cr);
-    translate([dock_width/2 - wall_cr, dock_length - wall_cr]) circle(wall_cr);
-    translate([-dock_width/2, flat_cuts ? 0 : -chin_hem])
-      square([dock_width,chin_height]);
-  }
+  linear_extrude(chin_hem+dock_length, convexity = 10) dock_perimeter();
 }
 
 module plughole() {
@@ -252,29 +247,43 @@ module throughhole() {
 }
 
 module dock_back_face() {
-  difference() {
-    dock_face_common();
-  }
+  translate([0,dock_length/2])
+    round_tbcorners_rect(dock_width,dock_length,back_top_corner_bevel,0);
 }
 
 module fillet(r,o=eps) {
   polygon([[0,0],each curve_points([r+eps,r+eps],[-r-eps,-r-eps])]);
 }
 
+
+function reverse(a) = [for (i=[len(a)-1:-1:0]) a[i]];
+
+function front_face_side_points(x) = [
+    each curve_points(
+      [x*(lip_cleft_width/2-lip_cleft_fillet),
+        chin_height+lip_height-lip_cleft_fillet],
+      [x*(lip_cleft_fillet),-lip_cleft_fillet],cw=x<0),
+    each curve_points(
+      [x*(lip_cleft_width/2+lip_cleft_bevel),
+        chin_height+lip_height-lip_cleft_bevel],
+      [x*(-lip_cleft_bevel),lip_cleft_bevel],cw=x>0),
+    each curve_points(
+      [x*(screen_width/2-screen_cr),
+        chin_height+lip_height+screen_cr],
+      [x*screen_cr,-screen_cr],cw=x<0),
+    each curve_points(
+      [x*(screen_width/2+front_cheek_bevel),
+        chin_height+lip_height+front_cheek_height-front_cheek_bevel],
+      [x*(-front_cheek_bevel),front_cheek_bevel],cw=x>0),
+    [x*dock_width/2,chin_height+lip_height+front_cheek_height],
+    [x*dock_width/2,-chin_hem]
+];
+
 module dock_front_face() {
-  difference() {
-    dock_face_common();
-    translate([0,flat_cuts?chin_hem:0]) {
-      translate([0, chin_height+lip_height+wall_height/2+screen_cr/2])
-        round_corner_rect(screen_width,wall_height+screen_cr, screen_cr);
-      translate([0, chin_height+lip_height])
-        round_corner_rect(lip_cleft_width,2*lip_cleft_height, lip_cleft_fillet);
-      translate([lip_cleft_width/2, chin_height+lip_height]) mirror([0,1])
-        fillet(lip_cleft_bevel);
-      translate([-lip_cleft_width/2, chin_height+lip_height]) mirror([1,1])
-        fillet(lip_cleft_bevel);
-    }
-  }
+  translate([0,flat_cuts?chin_hem:0]) polygon([
+    each front_face_side_points(1),
+    each reverse(front_face_side_points(-1))
+  ]);
 }
 
 module dockblock_faces() {
@@ -287,6 +296,12 @@ module dockblock_faces() {
       mirror([0,0,1])
       linear_extrude(dock_depth/2)
         dock_back_face();
+      translate([0,0,-dock_depth/2]) linear_extrude(dock_depth) {
+        translate([-dock_width/2,0])
+          square([wall_thickness,dock_length-back_top_corner_bevel]);
+        translate([dock_width/2-wall_thickness,0])
+          square([wall_thickness,dock_length-back_top_corner_bevel]);
+      }
     }
 }
 
@@ -300,14 +315,14 @@ module dock_chinfill() {
       rotate([90,0,90])
         translate([0,0,-dock_width/2])
         linear_extrude(dock_width + 2*eps)
-          translate([0,chin_height + wall_height])
-          round_lrcorners_rect(device_depth_total+2*eps,2*wall_height,
+          translate([0,dock_length])
+          round_lrcorners_rect(device_depth_total+2*eps,2*back_height,
             device_front_edge_bevel,device_back_edge_bevel);
       rotate([90,0,0])
         translate([0,0,-dock_depth/2])
         linear_extrude(dock_depth + 2*eps)
-          translate([0,chin_height + wall_height])
-          round_corner_rect(device_width_total+2*eps,2*wall_height,
+          translate([0,chin_height + back_height])
+          round_corner_rect(device_width_total+2*eps,2*back_height,
             device_bottom_cr);
     }
 
@@ -319,13 +334,22 @@ module dock_chinfill() {
 }
 
 module dockblock_profile () {
-  hull () {
-    translate([0,chin_height + wall_height/2])
-      round_lrcorners_rect(dock_depth,wall_height,
-        cheek_front_edge_bevel,cheek_back_edge_bevel);
-    polygon([[-dock_depth/2,chin_height],[dock_depth/2,chin_height],
-      [dock_depth/2,chin_hem],[-dock_depth/2,-chin_hem]]);
-  }
+  polygon([
+    [dock_depth/2,chin_hem],
+    [-dock_depth/2,-chin_hem],
+    each curve_points(
+      [-dock_depth/2+front_cheek_bevel,chin_height+lip_height-front_cheek_bevel],
+      [-front_cheek_bevel,front_cheek_bevel], cw=true),
+    each curve_points(
+      [-front_fillet,chin_height+lip_height+front_fillet],
+      [front_fillet,-front_fillet],cw=false),
+    each curve_points(
+      [front_top_corner_bevel,dock_length-front_top_corner_bevel],
+      [-front_top_corner_bevel,front_top_corner_bevel],cw=true),
+    each curve_points(
+      [dock_depth/2-back_top_corner_bevel,dock_length-back_top_corner_bevel],
+      [back_top_corner_bevel,back_top_corner_bevel],cw=true)
+    ]);
 }
 
 module dockblock_bounds () {
@@ -431,11 +455,6 @@ module a_stripes() {
     dock_assembly();
     striping();
   }
-}
-
-module test_wedge () {
-  polygon([[0,0],each curve_points([0,0],[-8,-8])]);
-  echo([[0,0],each curve_points([0,0],[8,8])]);
 }
 
 onepiece();
