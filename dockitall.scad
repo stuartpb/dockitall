@@ -24,13 +24,13 @@ device_front_edge_bevel = 3;
 device_back_edge_bevel = 5;
 
 // The radius of the bottom left and right corners.
-device_bottom_cr = 8;
+device_bottom_corner_radius = 8;
 
 // The width of the front opening for the screen.
 screen_width = 72;
 
 // The radius of the corner that will descend to the lip.
-screen_cr = 5.5;
+screen_corner_radius = 5.5;
 
 // Offset of the port from the center of the bottom.
 port_x_offset = 0;
@@ -64,11 +64,11 @@ cable_tolerance = 0;
 
 /* [Parameters] */
 
-// Whether front and back cuts should be level relative to the base.
-// TODO: Fix this (skew vs. rotate profile)
-flat_cuts = false;
+// Whether top surfaces should be flat / parallel to the base.
+level_tops = false;
 
 // Whether the cable should be laid into the case from the back.
+// (Deprecated; not currently implemented.)
 open_channel = false;
 
 // What angle to recline the phone at (from a straight-up zero degrees).
@@ -85,7 +85,7 @@ lip_height = 10;
 base_thickness = 5;
 
 // The corner radius of the back corner.
-base_cr = device_front_edge_bevel;
+base_corner_radius = device_front_edge_bevel;
 
 // The thickness of the walls.
 wall_thickness = 3;
@@ -104,16 +104,22 @@ lip_cleft_bevel = 3;
 
 // The height above the lip that the cheek extends around the front.
 front_cheek_height = (screen_width-lip_cleft_width)/2;
-front_cheek_bevel = 0;
+front_cheek_bevel = 3;
 front_top_corner_bevel = 5;
-// The radius of the curve to the front.
-front_fillet = 5;
+// The radius of the curve from the back to the front cheeks.
+front_fillet = 2;
 
 back_height = 50;
 back_cheek_height = back_height;
 
-//TODO: Separate this between face and profile corners?
 back_top_corner_bevel = 3;
+side_back_corner_bevel = 3;
+
+/* [Testing] */
+
+// The region to render when printing a test dockblock.
+test_bottom = 10;
+test_height = 40;
 
 /* [Rendering] */
 
@@ -125,15 +131,6 @@ $fa = 1;
 $fs = 1;
 
 /* [Hidden] */
-
-/*
-Assumptions in the current formulation:
-
-- Back will have a thickness (no epsilon applied for back)
-- Back will be taller than walls/lip
-- Device is thicker than plug
-- Chin is longer than plug
-*/
 
 device_depth_total = device_depth + 2*device_tolerance;
 dock_depth = device_depth_total + 2*wall_thickness;
@@ -204,7 +201,7 @@ module dock_perimeter() {
 
 module dock_walls () {
   translate([0,0,-chin_hem])
-  linear_extrude(chin_hem+dock_length, convexity = 10) dock_perimeter();
+  linear_extrude(2*chin_hem+dock_length, convexity = 10) dock_perimeter();
 }
 
 module plughole() {
@@ -213,10 +210,10 @@ module plughole() {
 
 module backhole() {
   rotate([90,0,0])
-  multmatrix([[1,0,0,0], [0,1,flat_cuts?-tan(recline_angle):0,0],
+  multmatrix([[1,0,0,0], [0,1,level_tops?-tan(recline_angle):0,0],
       [0,0,1,0],[0,0,0,1]])
   translate([port_x_offset,
-    (flat_cuts ? 0 : chin_hem)+ chin_height + plug_depth/2 + through_tolerance,
+    (level_tops ? 0 : chin_hem)+ chin_height + plug_depth/2 + through_tolerance,
     -plug_length])
   
     linear_extrude(plug_length)
@@ -255,7 +252,6 @@ module fillet(r,o=eps) {
   polygon([[0,0],each curve_points([r+eps,r+eps],[-r-eps,-r-eps])]);
 }
 
-
 function reverse(a) = [for (i=[len(a)-1:-1:0]) a[i]];
 
 function front_face_side_points(x) = [
@@ -268,9 +264,9 @@ function front_face_side_points(x) = [
         chin_height+lip_height-lip_cleft_bevel],
       [x*(-lip_cleft_bevel),lip_cleft_bevel],cw=x>0),
     each curve_points(
-      [x*(screen_width/2-screen_cr),
-        chin_height+lip_height+screen_cr],
-      [x*screen_cr,-screen_cr],cw=x<0),
+      [x*(screen_width/2-screen_corner_radius),
+        chin_height+lip_height+screen_corner_radius],
+      [x*screen_corner_radius,-screen_corner_radius],cw=x<0),
     each curve_points(
       [x*(screen_width/2+front_cheek_bevel),
         chin_height+lip_height+front_cheek_height-front_cheek_bevel],
@@ -280,7 +276,7 @@ function front_face_side_points(x) = [
 ];
 
 module dock_front_face() {
-  translate([0,flat_cuts?chin_hem:0]) polygon([
+  translate([0,level_tops?chin_hem:0]) polygon([
     each front_face_side_points(1),
     each reverse(front_face_side_points(-1))
   ]);
@@ -288,7 +284,7 @@ module dock_front_face() {
 
 module dockblock_faces() {
   rotate([90,0,0])
-    multmatrix([[1,0,0,0], [0,1,flat_cuts?-tan(recline_angle):0,0],
+    multmatrix([[1,0,0,0], [0,1,level_tops?-tan(recline_angle):0,0],
       [0,0,1,0],[0,0,0,1]])
     union () {
       linear_extrude(dock_depth/2)
@@ -296,6 +292,7 @@ module dockblock_faces() {
       mirror([0,0,1])
       linear_extrude(dock_depth/2)
         dock_back_face();
+      // ensure full side walls for front fillet
       translate([0,0,-dock_depth/2]) linear_extrude(dock_depth) {
         translate([-dock_width/2,0])
           square([wall_thickness,dock_length-back_top_corner_bevel]);
@@ -309,7 +306,7 @@ module dock_chinfill() {
   difference () {
     translate([0,0,-chin_hem])
       linear_extrude(chin_height + chin_hem +
-        max(device_front_edge_bevel, device_back_edge_bevel,device_bottom_cr))
+        max(device_front_edge_bevel, device_back_edge_bevel,device_bottom_corner_radius))
       offset(delta=device_tolerance) device_cross_section();
     intersection () {
       rotate([90,0,90])
@@ -323,7 +320,7 @@ module dock_chinfill() {
         linear_extrude(dock_depth + 2*eps)
           translate([0,chin_height + back_height])
           round_corner_rect(device_width_total+2*eps,2*back_height,
-            device_bottom_cr);
+            device_bottom_corner_radius);
     }
 
     // docking plug carveout in chin
@@ -335,24 +332,26 @@ module dock_chinfill() {
 
 module dockblock_profile () {
   polygon([
-    [dock_depth/2,chin_hem],
-    [-dock_depth/2,-chin_hem],
+    [dock_depth/2,level_tops?0:chin_hem],
+    [-dock_depth/2,level_tops?0:-chin_hem],
     each curve_points(
-      [-dock_depth/2+front_cheek_bevel,chin_height+lip_height-front_cheek_bevel],
+      [-dock_depth/2+front_cheek_bevel,chin_height+lip_height+front_cheek_height-front_cheek_bevel],
       [-front_cheek_bevel,front_cheek_bevel], cw=true),
     each curve_points(
-      [-front_fillet,chin_height+lip_height+front_fillet],
+      [-front_fillet,chin_height+lip_height+front_cheek_height+front_fillet],
       [front_fillet,-front_fillet],cw=false),
     each curve_points(
       [front_top_corner_bevel,dock_length-front_top_corner_bevel],
       [-front_top_corner_bevel,front_top_corner_bevel],cw=true),
     each curve_points(
-      [dock_depth/2-back_top_corner_bevel,dock_length-back_top_corner_bevel],
-      [back_top_corner_bevel,back_top_corner_bevel],cw=true)
+      [dock_depth/2-side_back_corner_bevel,dock_length-side_back_corner_bevel],
+      [side_back_corner_bevel,side_back_corner_bevel],cw=true)
     ]);
 }
 
 module dockblock_bounds () {
+  multmatrix([[1,0,0,0], [0,1,0,0],
+    [0,level_tops?tan(recline_angle):0,1,0],[0,0,0,1]])
   rotate([90,0,90])
     translate([0,0,-dock_width/2])
     linear_extrude(dock_width)
@@ -369,7 +368,7 @@ module base_footprint () {
         square([dock_width,base_length - dock_depth/2 -
           sqrt(2*device_front_edge_bevel*device_front_edge_bevel)]);
       translate([0,base_length - dock_depth/2 - 2*device_front_edge_bevel])
-        circle(base_cr);
+        circle(base_corner_radius);
     }
   }
 }
@@ -416,8 +415,9 @@ module dock_assembly () {
 
 module test_dockblock() {
   intersection() {
-    translate([-dock_width/2,-dock_depth/2,0]) cube([dock_width,dock_depth,40]);
-    translate([0,0,-10]) dockblock();
+    translate([-dock_width/2,-dock_depth/2,0])
+      cube([dock_width,dock_depth,test_height]);
+    translate([0,0,-test_bottom]) dockblock();
   }
 }
 
@@ -457,12 +457,14 @@ module a_stripes() {
   }
 }
 
+/* Single-material model */
 onepiece();
 
+/* Multi-material model */
 //a_stripes();
 //b_stripes();
 //base_plate();
 
+/* Test pieces */
 //test_dockblock();
 //cable_test();
-//test_wedge();
