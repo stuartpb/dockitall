@@ -72,7 +72,7 @@ cable_tolerance = 0;
 /* [Parameters] */
 
 // Whether top surfaces should be flat / parallel to the base.
-level_tops = true;
+level_tops = false;
 
 // Whether the cable should be laid into the case from the back.
 open_channel = false;
@@ -88,7 +88,7 @@ chin_height = 32;
 lip_height = 10;
 
 // The thickness of the bottom base.
-base_thickness = 5;
+base_thickness = 6.4;
 
 // The corner radius of the back corner.
 base_corner_radius = device_front_edge_bevel;
