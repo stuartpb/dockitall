@@ -6,6 +6,7 @@
 
 /* [Cosmetic] */
 
+// How wide to make the multi-material stripes.
 stripe_width = 14;
 
 /* [Measurements] */
@@ -49,13 +50,19 @@ plug_radius = plug_depth/2;
 // The length of the plug before tapering off to the cable.
 plug_length = 18;
 // The diameter of the cable immediately following the end of the plug.
-cable_gauge = 3.5;//4.6;
+  // Note that the immediate end of the plug really only matters in the
+  // cradle used by the "open channel" design. If using the bottom-hole instead,
+  // you could also go with 3.5 (the gauge of the cable after the neck),
+  // but this gives a little extra "breathing room" regardless.
+cable_gauge = 4.20;
 
 /* [Tolerances] */
 
 // How much extra space to leave around the device.
 device_tolerance = .05;
 // How much extra space to leave around the through-hole for the plug.
+  // (If you use the "open channel" back-face through-hole design,
+  // you might want this extra big to allow for maneuvering around the lip.)
 through_tolerance = .1;
 // How much extra space to leave around the plug.
 plug_tolerance = 0;
@@ -65,10 +72,9 @@ cable_tolerance = 0;
 /* [Parameters] */
 
 // Whether top surfaces should be flat / parallel to the base.
-level_tops = false;
+level_tops = true;
 
 // Whether the cable should be laid into the case from the back.
-// (Deprecated; not currently implemented.)
 open_channel = false;
 
 // What angle to recline the phone at (from a straight-up zero degrees).
@@ -147,6 +153,12 @@ chin_hem = tan(recline_angle)*dock_depth/2;
 
 base_length = dock_width * cos(30);
 
+/*
+///// Code /////
+*/
+
+/* Rendering components */
+
 function curve_points(o,d,cw=true) =
   (abs(d[0]) > 0 && abs(d[1]) > 0) ?
     // number of facets for 1/4 circle ($fn if defined)
@@ -188,6 +200,8 @@ module round_corner_rect(w,h,r) {
   round_4corners_rect(w,h,r,r,r,r);
 }
 
+/* Dock design components */
+
 module device_cross_section() {
   round_tbcorners_rect(device_width,device_depth,device_back_edge_bevel,device_front_edge_bevel);
 }
@@ -213,7 +227,7 @@ module backhole() {
   multmatrix([[1,0,0,0], [0,1,level_tops?-tan(recline_angle):0,0],
       [0,0,1,0],[0,0,0,1]])
   translate([port_x_offset,
-    (level_tops ? 0 : chin_hem)+ chin_height + plug_depth/2 + through_tolerance,
+    chin_hem + chin_height + plug_depth/2 + through_tolerance,
     -plug_length])
   
     linear_extrude(plug_length)
@@ -222,7 +236,14 @@ module backhole() {
 }
 
 module throughhole() {
-  if (plug_width + 2*through_tolerance > device_depth_total) {
+  // When the cable will be coming through the backhole
+  if (open_channel) {
+    // Just channel for the cable, below the plug holder and coming out the back
+    translate([0,0,-chin_hem]) linear_extrude(chin_height + chin_hem + plug_depth)
+      translate([port_x_offset, port_y_offset-cable_total/2 + dock_depth/2]) 
+      round_corner_rect(cable_total, dock_depth, cable_total/2);
+  // Hourglass hole if plug can't fit vertically
+  } else if (plug_width + 2*through_tolerance > device_depth_total) {
     through_r = plug_radius+through_tolerance;
     a = plug_width/2 - plug_radius;
     b = plug_depth/2 - plug_radius;
@@ -236,6 +257,7 @@ module throughhole() {
         rotate(-angle) offset(delta=through_tolerance) plughole($fn=24);
         square([cos(tilt) * 2 * (hypo+through_tolerance),device_depth_total], center=true);
       }
+  // Vertical hole if plug can fit
   } else {
     translate([port_x_offset, port_y_offset, -chin_hem])
       linear_extrude(chin_height + chin_hem + plug_depth)
@@ -377,8 +399,8 @@ module base_plate() {
   difference() {
     linear_extrude(base_thickness) base_footprint();
     if (open_channel) {
-      linear_extrude(base_thickness)
-      translate([dock_width/2 - cable_total/2 + port_x_offset, -eps])
+      translate([0,0,-eps]) linear_extrude(base_thickness+2*eps)
+      translate([-cable_total/2 + port_x_offset, 0])
         square([cable_total, base_length + eps]);
     }
     rotate([-recline_angle, 0, 0]) throughhole();
@@ -403,6 +425,7 @@ module dockblock() {
       }
     }
     throughhole();
+    if (open_channel) backhole();
   }
 }
 
@@ -456,6 +479,10 @@ module a_stripes() {
     striping();
   }
 }
+
+/*
+///// Entry points /////
+*/
 
 /* Single-material model */
 onepiece();
